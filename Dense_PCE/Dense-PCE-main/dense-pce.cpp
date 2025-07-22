@@ -194,6 +194,7 @@ private:
     int max_size;
     int total_nodes;
     float theta_P;
+    std::vector<int> inside_P_all;
     int total_nodes_in_P;
     int total_edges_in_P;
     int iter_count = 0;
@@ -207,6 +208,30 @@ private:
 
     // std::unordered_map<int, TrackInfo> tracks;
     std::vector<std::vector<int> > tracks;
+
+
+    int get_minimum_degree_in_P() {
+    int min_deg = std::numeric_limits<int>::max();
+    for (int v : inside_P_all) {
+        int deg_in_P = 0;
+        for (const auto& adj : graph.adj_map[v]) {
+            int u = adj.first;
+            if (tracks[u][0]) deg_in_P++;
+        }
+        min_deg = std::min(min_deg, deg_in_P);
+    }
+    return min_deg == std::numeric_limits<int>::max() ? 0 : min_deg;
+}
+
+bool satisfies_edge_bound(int l_target) {
+    if (l_target <= total_nodes_in_P) return false;
+    int current_edges = total_edges_in_P;
+    int min_deg = get_minimum_degree_in_P();
+    int delta = l_target - total_nodes_in_P;
+    double potential_new_edges = delta * (min_deg + (delta + 1) / 2.0);
+    double required_edges = theta * l_target * (l_target - 1) / 2.0;
+    return (current_edges + potential_new_edges) >= required_edges;
+}
 
     
 
@@ -232,6 +257,7 @@ void PseudoCliqueEnumerator::add_to_inside_P(int v) {
     tracks[v][1] = tracks[v][2];
     inside_P[tracks[v][1]].push_back(v);
     tracks[v][3] = inside_P[tracks[v][1]].size() - 1;
+    inside_P_all.push_back(v);
     
 
     for (const auto& adj_v_ite : graph.adj_map[v]) {
@@ -343,9 +369,26 @@ void PseudoCliqueEnumerator::remove_from_inside_P(int v) {
 
         total_nodes_in_P--;
         set_theta_P();
+        inside_P_all.pop_back(); // assumes DFS-style traversal
+
 }
 
+
+
+
+
 void PseudoCliqueEnumerator::iter(int v) {
+
+    // FPCE Edge Bound Pruning
+    bool can_grow = false;
+    for (int l = total_nodes_in_P + 1; l <= max_size; ++l) {
+        if (satisfies_edge_bound(l)) {
+            can_grow = true;
+            break;
+        }
+    }
+    if (!can_grow) return; // Prune this branch
+
     // std::cout << "iter: " << v << "\n";
     iter_count++;
     int c = 0;
