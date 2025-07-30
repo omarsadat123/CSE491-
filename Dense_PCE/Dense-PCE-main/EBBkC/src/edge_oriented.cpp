@@ -549,17 +549,16 @@ void EBBkC_Graph_t::EBBkC_plus_plus(int l, unsigned long long *cliques) {
         return;
     }
 
-    if (l == 2) { //finding 2-cliques at the subproblem, base case, count all edges in the subproblem's DAG
-        // each arc (u->v) in the DAG is a 2-clique extension:
-        auto &ends3 = branch_ends[K];
+    if (l == 2) {
+        auto &top_ends = branch_ends[K];  // Get top-level endpoints
         for (i = 0; i < sub_v_size[l]; i++) {
             u = sub_v[l][i];
             for (j = 0; j < DAG_deg[l][u]; j++) {
                 v = DAG_adj[u][j];
-                //cliques_vec.push_back({ ends3.first, ends3.second, u, v });
+                // Include top-level endpoints + current edge
                 cliques_vec.push_back({
-                    ends3.first,
-                    ends3.second,
+                    top_ends.first,
+                    top_ends.second,
                     this->new2old[u],
                     this->new2old[v]
                 });
@@ -571,6 +570,7 @@ void EBBkC_Graph_t::EBBkC_plus_plus(int l, unsigned long long *cliques) {
 
     if (l == 3) { // base case, highly optimized routine to count all triangles in the current DAG subproblem 
         // fully enumerate each triangle in the DAG by storing {u,v,w}
+        auto &top_ends = branch_ends[K];  // Get top-level endpoints
         for (i = 0; i < sub_v_size[l]; i++) {
             u = sub_v[l][i];
             if (col[u] < l) continue;
@@ -582,9 +582,10 @@ void EBBkC_Graph_t::EBBkC_plus_plus(int l, unsigned long long *cliques) {
                 for (k = 0; k < DAG_deg[l][v]; k++) {
                     w = DAG_adj[v][k];
                     if (lab[w] == l-1) {
-                        // record and count
-                        //cliques_vec.push_back({ u, v, w });
+                        // Include top-level endpoints + triangle
                         cliques_vec.push_back({
+                            top_ends.first,
+                            top_ends.second,
                             this->new2old[u],
                             this->new2old[v],
                             this->new2old[w]
@@ -670,16 +671,20 @@ void EBBkC_Graph_t::EBBkC_Comb_list(int *list, int  list_size, int  start, int  
 
     // BASE CASE: we’ve picked k vertices → record & count
     if (picked == k) {
-        printf("Found clique of size %d: ", k);
         std::vector<int> orig;
-        orig.reserve(k);
+        orig.reserve(k + 2);  // Reserve space for clique + endpoints
+        
+        // Add top-level endpoints first
+        auto &top_ends = this->branch_ends[K];
+        orig.push_back(top_ends.first);
+        orig.push_back(top_ends.second);
+        
+        // Add vertices from combinatorial list
         for (int t = 0; t < k; t++) {
-            // Convert subgraph index to main graph index
             int main_idx = this->new2old[cur[t]];
-            printf("%d ", main_idx); // Print main graph IDs
             orig.push_back(main_idx);
         }
-        printf("\n");
+        
         cliques_vec.push_back(orig);
         (*cliques)++;
         return;
