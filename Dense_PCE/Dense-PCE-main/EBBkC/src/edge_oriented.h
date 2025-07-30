@@ -2,11 +2,13 @@
 #define DESCOL_EBBKC_H
 #include "def.h"
 #include <vector>
-#include <omp.h> // Add for omp_lock_t
-
-extern std::vector<std::vector<int>> stored_cliques;
 
 using namespace std;
+
+// —— new: store each found clique ——
+// each inner vector holds the global vertex IDs of one clique
+// extern unsigned long long N;
+extern std::vector<std::vector<int>> cliques_vec;
 
 class EBBkC_Graph_t {
 
@@ -58,18 +60,7 @@ public:
     int *lev = nullptr;
     int *loc = nullptr;
 
-    // for storing cliques
-    std::vector<std::vector<int>> stored_cliques;
-    std::vector<int> current_clique;
-    omp_lock_t clique_lock; // Add lock for thread-safety
-    
-    // Methods for clique storage
-    void store_current_clique();
-    void add_to_current_clique(int vertex);
-    void remove_from_current_clique();
-    std::vector<std::vector<int>> get_stored_cliques() const;
-    void clear_stored_cliques();
-    void store_clique_from_list(int* list, int list_size, int k);
+    std::vector<std::pair<int,int>> branch_ends; // size K+1  
 
     EBBkC_Graph_t();
     ~EBBkC_Graph_t();
@@ -88,6 +79,7 @@ public:
 
     bool can_terminate(int l, unsigned long long* cliques);
     void list_in_plex(int start, int p, int q, unsigned long long* cliques);
+    void EBBkC_Comb_list(int *list, int  list_size, int  start, int  picked, int  k, unsigned long long *cliques);
 };
 
 
