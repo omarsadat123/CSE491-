@@ -746,11 +746,8 @@ bool EBBkC_Graph_t::can_terminate(int l, unsigned long long *cliques) {
     if (sub_e_size[l] < sub_v_size[l] * (sub_v_size[l] - L) / 2) return false;
 
     if (sub_e_size[l] == sub_v_size[l] * (sub_v_size[l] - 1) / 2) {
-        if (l > sub_v_size[l] - l)
-            EBBkC_Comb_list(sub_v[l], sub_v_size[l], 0, 0, sub_v_size[l] - l, cliques);
-        else
-            EBBkC_Comb_list(sub_v[l], sub_v_size[l], 0, 0, l, cliques);
-
+        // FIX: Always choose l vertices (needed for clique formation)
+        EBBkC_Comb_list(sub_v[l], sub_v_size[l], 0, 0, l, cliques);
         return true;
     }
 
