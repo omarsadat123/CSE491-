@@ -246,8 +246,8 @@ void EBBkC_Graph_t::truss_decompose(const char *dir) {
     // The key call is truss_num = PKT_intersection(...), which executes a parallel truss decomposition algorithm. This function computes the truss value and a rank for every edge in the graph. The maximum truss value found is stored in truss_num.
     truss_num = PKT_intersection(&g, EdgeSupport, edgeIdToEdge);
     // DEBUG: Print truss_num immediately after decomposition
-    printf("PKT_intersection returned truss_num = %d\n", truss_num); 
-    log_info("Truss decomposition done. truss_num = %d", truss_num);
+    // printf("PKT_intersection returned truss_num = %d\n", truss_num); 
+    // log_info("Truss decomposition done. truss_num = %d", truss_num);
 
 #pragma omp single
     {
@@ -265,7 +265,7 @@ void EBBkC_Graph_t::truss_decompose(const char *dir) {
         int skipped_edges = 0;
         
         for (int i = 0; i < g.m / 2; i++) {
-            if (g.edge_truss[i] < K) { // Changed from <= to <
+            if (g.edge_truss[i] <= K) { // Changed from <= to <
                 skipped_edges++;
                 continue;
             }
@@ -310,7 +310,7 @@ void EBBkC_Graph_t::truss_decompose(const char *dir) {
         }
 
         // DEBUG: Print edge filtering results
-        printf("Edge filtering: Total=%d, Kept=%d, Skipped=%d\n", g.m/2, kept_edges, skipped_edges);
+        printf("Edge filtering: Total=%ld, Kept=%d, Skipped=%d\n", g.m/2, kept_edges, skipped_edges);
         printf("Edge | Truss | Rank\n");
         for (int i = 0; i < e_size; i++) {
             printf("%d-%d | %d | %d\n", 
@@ -424,12 +424,13 @@ void EBBkC_Graph_t::branch(int e, EBBkC_Graph_t* g) {
 
     if (l == 3 || l == 4) {
         g->sub_v_size[l - 2] = g->v_size;
+        g->sub_e_size[l - 2] = g->e_size;
         // Initialize candidate vertex set
         for (int idx = 0; idx < g->v_size; idx++) {
             g->sub_v[l-2][idx] = idx;  // Store local vertex indices
         }
         if (l == 4) {
-            g->sub_e_size[l - 2] = g->e_size;
+            //g->sub_e_size[l - 2] = g->e_size;
             for (int idx = 0; idx < g->e_size; idx++) {
                 g->sub_e[l-2][idx] = idx;  // Store local edge indices
             }
