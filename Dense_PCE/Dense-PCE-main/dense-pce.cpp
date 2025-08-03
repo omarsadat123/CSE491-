@@ -387,8 +387,12 @@ void PseudoCliqueEnumerator::iter(int v) {
             break;
         }
     }
-    if (!can_grow) return; // Prune this branch
-
+    if (!can_grow) 
+    {
+        std::cout<< "Pruned" << std::endl;
+        return; // Prune this branch
+    }
+        
     // std::cout << "iter: " << v << "\n";
     iter_count++;
     int c = 0;
