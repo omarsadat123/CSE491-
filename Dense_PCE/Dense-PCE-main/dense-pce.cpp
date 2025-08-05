@@ -123,7 +123,7 @@ public:
         }
         std::vector<int> keys(graph.total_nodes);
         std::iota(keys.begin(), keys.end(), 0);
-
+        int pruned = 0;
 
         neighbors_and_P[0] = keys;
 
@@ -184,6 +184,9 @@ public:
     int get_iter_count(){
         return iter_count;
     };
+    int get_pruning_count(){
+        return pruning;
+    };
 
 private:
 
@@ -198,6 +201,7 @@ private:
     int total_nodes_in_P;
     int total_edges_in_P;
     int iter_count = 0;
+    int pruning = 0;
 
     std::stack<int> children;
 
@@ -211,17 +215,17 @@ private:
 
 
     int get_minimum_degree_in_P() {
-    int min_deg = std::numeric_limits<int>::max();
-    for (int v : inside_P_all) {
-        int deg_in_P = 0;
-        for (const auto& adj : graph.adj_map[v]) {
-            int u = adj.first;
-            if (tracks[u][0]) deg_in_P++;
+        int min_deg = std::numeric_limits<int>::max();
+        for (int v : inside_P_all) {
+            int deg_in_P = 0;
+            for (const auto& adj : graph.adj_map[v]) {
+                int u = adj.first;
+                if (tracks[u][0]) deg_in_P++;
+            }
+            min_deg = std::min(min_deg, deg_in_P);
         }
-        min_deg = std::min(min_deg, deg_in_P);
-    }
-    return min_deg == std::numeric_limits<int>::max() ? 0 : min_deg;
-}
+        return min_deg == std::numeric_limits<int>::max() ? 0 : min_deg;
+    }   
 
 bool satisfies_edge_bound(int l_target) {
     if (l_target <= total_nodes_in_P) return false;
@@ -374,25 +378,21 @@ void PseudoCliqueEnumerator::remove_from_inside_P(int v) {
 }
 
 
-
-
-
 void PseudoCliqueEnumerator::iter(int v) {
 
     // FPCE Edge Bound Pruning
     bool can_grow = false;
-    for (int l = total_nodes_in_P + 1; l <= max_size; ++l) {
-        if (satisfies_edge_bound(l)) {
+    //for (int l = total_nodes_in_P + 1; l <= max_size; ++l) {
+        if (satisfies_edge_bound(min_size)) {
             can_grow = true;
-            break;
+            //break;
         }
-    }
-    if (!can_grow) 
-    {
-        std::cout<< "Pruned" << std::endl;
+    //}
+    if (!can_grow){
+        pruning++;
         return; // Prune this branch
     }
-        
+
     // std::cout << "iter: " << v << "\n";
     iter_count++;
     int c = 0;
@@ -527,7 +527,7 @@ int main(int argc, char* argv[]) {
     }
 
     std::vector<int> pseudo_clique_counts = PC.get_pseudo_cliques_count();
-
+    
     // Print the clique sizes
     std::cout << "Pseudo-clique counts:" << std::endl;
     for (size_t i = 1; i < pseudo_clique_counts.size(); ++i) {
@@ -535,10 +535,11 @@ int main(int argc, char* argv[]) {
             break;
             // pass;
         }
-        std::cout << "Size " << (i + minimum) << ": " << pseudo_clique_counts[i] << "\n";
+        std::cout << "Size " << (i) << ": " << pseudo_clique_counts[i] << "\n";
         
     }
     std::cout << std::endl << "Total Iterations: " << PC.get_iter_count() << "\n";
+    std::cout  << "Pruning Count: " << PC.get_pruning_count() << "\n";
 
     return 0;
 }
