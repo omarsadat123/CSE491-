@@ -381,12 +381,10 @@ void PseudoCliqueEnumerator::iter(int v) {
 
     // FPCE Edge Bound Pruning
     bool can_grow = false;
-    //for (int l = total_nodes_in_P + 1; l <= max_size; ++l) {
         if (satisfies_edge_bound(min_size)) {
             can_grow = true;
             //break;
         }
-    //}
     if (!can_grow){
         pruning++;
         return; // Prune this branch
