@@ -228,7 +228,6 @@ private:
     }   
 
 bool satisfies_edge_bound(int l_target) {
-    if (l_target <= total_nodes_in_P) return false;
     int current_edges = total_edges_in_P;
     int min_deg = get_minimum_degree_in_P();
     int delta = l_target - total_nodes_in_P;
