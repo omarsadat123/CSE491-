@@ -381,10 +381,12 @@ void PseudoCliqueEnumerator::iter(int v) {
 
     // FPCE Edge Bound Pruning
     bool can_grow = false;
+    //for (int l = total_nodes_in_P + 1; l <= max_size; ++l) {
         if (satisfies_edge_bound(min_size)) {
             can_grow = true;
             //break;
         }
+    //}
     if (!can_grow){
         pruning++;
         return; // Prune this branch
@@ -527,14 +529,12 @@ int main(int argc, char* argv[]) {
     
     // Print the clique sizes
     std::cout << "Pseudo-clique counts:" << std::endl;
-    for (size_t i = 1; i < pseudo_clique_counts.size(); ++i) {
-        if(pseudo_clique_counts[i] == 0){
-            break;
-            // pass;
-        }
-        std::cout << "Size " << (i) << ": " << pseudo_clique_counts[i] << "\n";
-        
+    for (int sz = minimum; sz <= maximum && sz < (int)pseudo_clique_counts.size(); ++sz) {
+    if (pseudo_clique_counts[sz] > 0) {
+        std::cout << "Size " << sz << ": " << pseudo_clique_counts[sz] << "\n";
     }
+}
+
     std::cout << std::endl << "Total Iterations: " << PC.get_iter_count() << "\n";
     std::cout  << "Pruning Count: " << PC.get_pruning_count() << "\n";
 
