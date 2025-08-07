@@ -123,6 +123,25 @@ EBBkC_Graph_t::~EBBkC_Graph_t() {
     delete [] loc;
 }
 
+
+//file writing function for dense-pce integration
+void EBBkC_Graph_t::finalize_clique_output(const char* output_path) {
+    FILE* f = fopen(output_path, "w");
+    if (!f) {
+        perror("Error opening clique output file");
+        exit(1);
+    }
+    
+    for (auto &cl : cliques_vec) {
+        for (int vid : cl) {
+            fprintf(f, "%d ", vid);
+        }
+        fprintf(f, "\n");
+    }
+    fclose(f);
+    cliques_vec.clear();
+}
+
 void EBBkC_Graph_t::build(bool sub) { //allocates and initializes all the data structures that the destructor deallocates. It takes a boolean sub to indicate if it's building a subproblem graph
     int i, k = K, node_size = v_size, link_size = e_size;
 
@@ -839,12 +858,20 @@ double EBBkC_t::list_k_clique(const char *file_name) {
     runtime = GetTime(&start, &end);
 
     printf("Number of %u-cliques: %llu\n", K, N);
-    
-    for (auto &cl : cliques_vec) {
-        printf("clique:");
-        for (int vid : cl) printf(" %d", vid);
-        printf("\n");
+
+    // Modified output path to include K in filename
+    std::string input_path(file_name);
+    if (!input_path.empty() && input_path.back() == '/') {
+        input_path.pop_back();
     }
+    std::string output_path = input_path + "/cliques_K" + std::to_string(K);
+    G.finalize_clique_output(output_path.c_str());
+    
+    // for (auto &cl : cliques_vec) {
+    //     printf("clique:");
+    //     for (int vid : cl) printf(" %d", vid);
+    //     printf("\n");
+    // }
     
     // clear for next run
     cliques_vec.clear();

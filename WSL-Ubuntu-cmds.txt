@@ -1,0 +1,4 @@
+cd "/mnt/h/OneDrive - northsouth.edu/Desktop/Dense_PCE/CSE491-/Dense_PCE/Dense-PCE-main"
+
+g++ -O3 dense-pce.cpp -o dense-pce
+./dense-pce "/mnt/h/OneDrive - northsouth.edu/Desktop/Dense_PCE/CSE491-/Dense_PCE/Dense-PCE-main/testGraphs/fpce_graph/fpce_graph.grh" --minimum 4 --theta 0.8

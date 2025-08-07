@@ -80,6 +80,9 @@ public:
     bool can_terminate(int l, unsigned long long* cliques);
     void list_in_plex(int start, int p, int q, unsigned long long* cliques);
     void EBBkC_Comb_list(int *list, int  list_size, int  start, int  picked, int  k, unsigned long long *cliques);
+
+    //file writing function for dense-pce integration
+    void finalize_clique_output(const char* output_path);
 };
 
 
