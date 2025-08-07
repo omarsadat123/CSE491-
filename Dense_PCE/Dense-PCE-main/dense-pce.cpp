@@ -15,6 +15,7 @@
 #include <cstring>
 #include <cerrno>
 #include <filesystem>
+#include <set> 
 
 // Define PATH_MAX if not already defined
 #ifndef PATH_MAX
@@ -129,6 +130,79 @@ public:
             current_vertex++;
         }
     }
+
+    std::vector<int> core_numbers;
+    void compute_core_numbers() {
+        unsigned int n = adj_map.size();
+        core_numbers.resize(n);  // Resize the member vector
+        std::vector<unsigned int> vert(n), pos(n), deg(n);
+        unsigned int md = 0;
+
+        // Calculate degrees and find maximum degree
+        for (unsigned int i = 0; i < n; i++) {
+            deg[i] = adj_map[i].size();
+            if (deg[i] > md) {
+                md = deg[i];
+            }
+        }
+
+        // Initialize bin array
+        std::vector<unsigned int> bin(md + 1, 0);
+        
+        // Count vertices of each degree
+        for (unsigned int v = 0; v < n; v++) {
+            bin[deg[v]]++;
+        }
+
+        // Compute starting positions in bins
+        unsigned int start = 0;
+        for (unsigned int d = 0; d <= md; d++) {
+            unsigned int num = bin[d];
+            bin[d] = start;
+            start += num;
+        }
+
+        // Place vertices in vert array by degree
+        for (unsigned int v = 0; v < n; v++) {
+            pos[v] = bin[deg[v]];
+            vert[pos[v]] = v;
+            bin[deg[v]]++;
+        }
+
+        // Restore bin starting positions
+        for (int d = md; d >= 1; d--) {
+            bin[d] = bin[d-1];
+        }
+        bin[0] = 0;
+
+        // Main core computation
+        for (unsigned int i = 0; i < n; i++) {
+            unsigned int v = vert[i];
+            core_numbers[v] = deg[v];
+            
+            // Process neighbors
+            for (const auto& neighbor : adj_map[v]) {
+                unsigned int u = neighbor.first;
+                if (deg[u] > deg[v]) {
+                    unsigned int du = deg[u];
+                    unsigned int pu = pos[u];
+                    unsigned int pw = bin[du];
+                    unsigned int w = vert[pw];
+                    
+                    // Swap vertices if needed
+                    if (u != w) {
+                        pos[u] = pw;
+                        vert[pu] = w;
+                        pos[w] = pu;
+                        vert[pw] = u;
+                    }
+                    
+                    bin[du]++;
+                    deg[u]--;
+                }
+            }
+        }
+    }
 };
 
 class PseudoCliqueEnumerator {
@@ -142,7 +216,6 @@ private:
     int total_nodes_in_P; //Total number of vertices in the current pseudo-clique P
     int total_edges_in_P; //Total number of edges in the current pseudo-clique P
     int iter_count = 0; //Counts the number of iterations of the algorithm
-    int R; // Size of seed cliques (r-cliques)
 
     std::stack<int> children; //Stack of vertices to be processed
 
@@ -160,6 +233,79 @@ private:
     // tracks[2] : How many neighbors does v have in P?
     // tracks[3] : what is v's position inside its inside_P bucket? [[],[8,7,12,17],...]
     // tracks[4] : what is v's position inside its neighbors_and_P bucket?
+
+
+    int R; // Size of seed cliques (r-cliques)
+    // for duplicate checking
+    std::set<std::vector<int>> found_maximal_cliques; // CHANGED: unordered_set to set
+    void add_vertex_internal(int v) {
+        if (total_nodes_in_P > max_size) {
+            return;
+        }
+        
+        //Updating v's info
+        tracks[v][0] = true;                             // Mark v as being part of P
+        tracks[v][1] = tracks[v][2];                     // Its new "degree_in_P" is its old degree_with_P"
+        inside_P[tracks[v][1]].push_back(v);             // Add v to the correct degree bucket in the inside_P list
+        tracks[v][3] = inside_P[tracks[v][1]].size() - 1; // Record its position in that bucket    
+    
+        //Working for v's neighbors
+        for (const auto& adj_v_ite : graph.adj_map[v]) {
+            
+            int adj_v = adj_v_ite.first;
+            // std::cout << "    ite: " << adj_v  << "\n";
+    
+            //Process neighbors of vertex v that are already in P
+            if (tracks[adj_v][0]) { // If neighbor is already in P
+                total_edges_in_P += 1; // New edge within P
+                //code to move adj_v to a higher degree bucket in inside_P
+                int degree = tracks[adj_v][1]; // Get degree of neighbor inside P
+                tracks[inside_P[degree].back()][3] = tracks[adj_v][3]; // Update position of neighbor in P
+    
+                // Swap and pop
+                std::swap(inside_P[degree][tracks[adj_v][3]], inside_P[degree].back()); // Swap neighbor with last vertex in degree bucket
+                inside_P[degree].pop_back(); // Remove last vertex from degree bucket
+    
+                inside_P[degree + 1].push_back(adj_v); // Add neighbor to next degree bucket
+                tracks[adj_v][3] = inside_P[degree + 1].size() - 1;
+                tracks[adj_v][1] = degree + 1;
+            }
+    
+            // Get the current "degree with respect to P" and position for the neighbor adj_v
+            int degree = tracks[adj_v][2]; // Get degree of neighbor wrt P
+            int pos = tracks[adj_v][4]; // Get position of neighbor in neighbors_and_P
+            int last_node = neighbors_and_P[degree].back(); // Get last vertex in degree bucket
+    
+            // Swap and pop
+            std::swap(neighbors_and_P[degree][pos], neighbors_and_P[degree].back());
+    
+            // std::cout << "       " << last_node << "\n";
+            
+            tracks[last_node][4] = pos;
+            // std::cout << "-----" << "\n";
+    
+            neighbors_and_P[degree].pop_back();
+    
+            neighbors_and_P[degree + 1].push_back(adj_v);
+            tracks[adj_v][4] = neighbors_and_P[degree + 1].size() - 1;
+            tracks[adj_v][2] = degree + 1;
+        }
+    
+        // Update global statistics
+        total_nodes_in_P += 1;
+        set_theta_P(); //Update theta_P
+    
+        // Check if current set qualifies as a pseudo-clique
+        // if (total_nodes_in_P >= min_size) {
+        //     // std::vector<int> pseudo_clique;
+        //     // for (const auto& nodes : inside_P) {
+        //     //     pseudo_clique.insert(pseudo_clique.end(), nodes.begin(), nodes.end());
+        //     // }
+        //     // pseudo_cliques.push_back(pseudo_clique);
+        //     pseudo_cliques_count[total_nodes_in_P] += 1;
+        // }
+    }
+
 
 public:
     PseudoCliqueEnumerator(Graph& graph, float theta = 1.0, int min_size = 1, int max_size = -1, int R = 0)
@@ -240,8 +386,6 @@ public:
     void remove_from_inside_P(int v);
     void iter(int v);
 
-    void enumerate_with_turan();  // Enumerate pseudo-cliques using Turan's theorem
-
     std::vector<int> get_pseudo_cliques_count(){
         return pseudo_cliques_count;
     };
@@ -258,6 +402,22 @@ public:
     //     std::sort(keys.begin(), keys.end());
     //     return keys;
     // }
+
+
+    void enumerate_with_turan();  // Enumerate pseudo-cliques using Turan's theorem
+    // ADD THIS NEW PUBLIC METHOD for reporting unique pseudo-cliques
+    void report_if_new(const std::vector<int>& clique) {
+        if (clique.size() < this->min_size) return;
+
+        // Create a sorted copy to act as a canonical key
+        std::vector<int> key = clique;
+        std::sort(key.begin(), key.end());
+
+        // The .second of the insert result is true if the insertion was new
+        if (found_maximal_cliques.insert(key).second) {
+            pseudo_cliques_count[clique.size()]++;
+        }
+    }
 }; 
 
 void PseudoCliqueEnumerator::enumerate_with_turan() {
@@ -277,99 +437,39 @@ void PseudoCliqueEnumerator::enumerate_with_turan() {
 
     // 3. Process each r-clique seed
     for (const auto& r_clique : r_cliques) {
+        auto sorted_clique = r_clique;
+        std::sort(sorted_clique.begin(), sorted_clique.end(), [&](int a, int b) {
+            return std::make_pair(graph.adj_map[a].size(), a) < std::make_pair(graph.adj_map[b].size(), b);
+        });
 
         // ======================= START: NEW DEBUG LINE =======================
         std::cout << "[DEBUG] Executing search branch starting from seed r-clique: ";
-        for(int v : r_clique) { std::cout << v << " "; }
+        for(int v : sorted_clique) { std::cout << v << " "; }
         std::cout << std::endl;
         // ======================== END: NEW DEBUG LINE ========================
         
-        // // --- A. Seed the enumerator's state ---
-        // for (int vertex : r_clique) {
-        //     add_vertex_internal(vertex); // Use the new helper that doesn't recurse
-        // }
+        // --- A. Seed the enumerator's state ---
+        for (int vertex : sorted_clique) {
+            add_vertex_internal(vertex); // Use the new helper that doesn't recurse
+        }
 
-        // // --- B. Kick-off the recursive search for extensions ---
+        // --- B. Kick-off the recursive search for extensions ---
         // int last_vertex = *std::max_element(r_clique.begin(), r_clique.end());
-        // iter(last_vertex);
+        int last_vertex = sorted_clique.back(); // Use last added vertex, not max_element
+        iter(last_vertex);
 
-        // // --- C. Backtrack to reset the state for the next seed ---
-        // // Must remove vertices in the reverse order of addition.
-        // for (auto it = r_clique.rbegin(); it != r_clique.rend(); ++it) {
-        //     remove_from_inside_P(*it);
-        // }
+        // --- C. Backtrack to reset the state for the next seed ---
+        // Must remove vertices in the reverse order of addition.
+        for (auto it = sorted_clique.rbegin(); it != sorted_clique.rend(); ++it) {
+            remove_from_inside_P(*it);
+        }
     }
 }
 
 void PseudoCliqueEnumerator::add_to_inside_P(int v) { //Add vertex v to the current pseudo-clique P and update all tracking structures in O(degree(v)) time.
     // std::cout << "adding: " << v  << "\n";
 
-    if (total_nodes_in_P > max_size) {
-        return;
-    }
-    
-    //Updating v's info
-    tracks[v][0] = true;                             // Mark v as being part of P
-    tracks[v][1] = tracks[v][2];                     // Its new "degree_in_P" is its old degree_with_P"
-    inside_P[tracks[v][1]].push_back(v);             // Add v to the correct degree bucket in the inside_P list
-    tracks[v][3] = inside_P[tracks[v][1]].size() - 1; // Record its position in that bucket    
-
-    //Working for v's neighbors
-    for (const auto& adj_v_ite : graph.adj_map[v]) {
-        
-        int adj_v = adj_v_ite.first;
-        // std::cout << "    ite: " << adj_v  << "\n";
-
-        //Process neighbors of vertex v that are already in P
-        if (tracks[adj_v][0]) { // If neighbor is already in P
-            total_edges_in_P += 1; // New edge within P
-            //code to move adj_v to a higher degree bucket in inside_P
-            int degree = tracks[adj_v][1]; // Get degree of neighbor inside P
-            tracks[inside_P[degree].back()][3] = tracks[adj_v][3]; // Update position of neighbor in P
-
-            // Swap and pop
-            std::swap(inside_P[degree][tracks[adj_v][3]], inside_P[degree].back()); // Swap neighbor with last vertex in degree bucket
-            inside_P[degree].pop_back(); // Remove last vertex from degree bucket
-
-            inside_P[degree + 1].push_back(adj_v); // Add neighbor to next degree bucket
-            tracks[adj_v][3] = inside_P[degree + 1].size() - 1;
-            tracks[adj_v][1] = degree + 1;
-        }
-
-        // Get the current "degree with respect to P" and position for the neighbor adj_v
-        int degree = tracks[adj_v][2]; // Get degree of neighbor wrt P
-        int pos = tracks[adj_v][4]; // Get position of neighbor in neighbors_and_P
-        int last_node = neighbors_and_P[degree].back(); // Get last vertex in degree bucket
-
-        // Swap and pop
-        std::swap(neighbors_and_P[degree][pos], neighbors_and_P[degree].back());
-
-        // std::cout << "       " << last_node << "\n";
-        
-        tracks[last_node][4] = pos;
-        // std::cout << "-----" << "\n";
-
-        neighbors_and_P[degree].pop_back();
-
-        neighbors_and_P[degree + 1].push_back(adj_v);
-        tracks[adj_v][4] = neighbors_and_P[degree + 1].size() - 1;
-        tracks[adj_v][2] = degree + 1;
-    }
-
-    // Update global statistics
-    total_nodes_in_P += 1;
-    set_theta_P(); //Update theta_P
-
-    // Check if current set qualifies as a pseudo-clique
-    if (total_nodes_in_P >= min_size) {
-        // std::vector<int> pseudo_clique;
-        // for (const auto& nodes : inside_P) {
-        //     pseudo_clique.insert(pseudo_clique.end(), nodes.begin(), nodes.end());
-        // }
-        // pseudo_cliques.push_back(pseudo_clique);
-        pseudo_cliques_count[total_nodes_in_P] += 1;
-    }
-
+    add_vertex_internal(v); // This updates the state
     iter(v); //Find and process the children of this NEW pseudo-clique
 }
 
@@ -475,7 +575,8 @@ void PseudoCliqueEnumerator::iter(int v) { //the "sophisticated process"
             if (tracks[u][0] || tracks[u][2] < theta_P) {//if u already in P or has degree less than theta_P
                 continue;
             }
-            if (graph.adj_map[v].count(u) && v > u) { //For Type 3, v is connected to u and we need v > u (lexicographic ordering)
+            //if (graph.adj_map[v].count(u) && v > u)
+            if (tracks[u][2] > tracks[v][2] || (tracks[u][2] == tracks[v][2] && u > v))  { //For Type 3, v is connected to u and we need v > u (lexicographic ordering)
                 bool valid = true;
                 for (int x : inside_P[v_star_degree]) {
                     if (!graph.adj_map[u].count(x)) {
@@ -498,6 +599,20 @@ void PseudoCliqueEnumerator::iter(int v) { //the "sophisticated process"
 
         
     }
+
+    // ---- NEW LOGIC ----
+    // After finding all potential children and incrementing 'c', but BEFORE the while loop.
+    if (c == 0) { // This means no children were found, so the current subgraph is maximal.
+        std::vector<int> current_p;
+        // Reconstruct the current pseudo-clique from the 'inside_P' buckets
+        for (const auto& bucket : inside_P) {
+            if (!bucket.empty()) {
+                current_p.insert(current_p.end(), bucket.begin(), bucket.end());
+            }
+        }
+        report_if_new(current_p); // Use the new duplicate-checking function
+    }
+    // ---- END NEW LOGIC ----
 
     // Iterate over children and add/remove them from inside_P
     while (c > 0) {
@@ -602,16 +717,17 @@ int main(int argc, char* argv[]) {
      * ----------------------------------------------------------------*/
     Graph graph;
     graph.read_graph_from_file(filename);
+    graph.compute_core_numbers();
 
     if (maximum == std::numeric_limits<int>::max()) {
         maximum = static_cast<int>(graph.adj_map.size());
     }
 
     PseudoCliqueEnumerator PC(graph, theta, minimum, maximum, R);
-    for (size_t node = 0; node < graph.adj_map.size(); ++node) {
-        PC.add_to_inside_P(node);
-        PC.remove_from_inside_P(node);
-    }
+    // for (size_t node = 0; node < graph.adj_map.size(); ++node) {
+    //     PC.add_to_inside_P(node);
+    //     PC.remove_from_inside_P(node);
+    // }
     PC.enumerate_with_turan();
 
     /* ------------------------------------------------------------------
